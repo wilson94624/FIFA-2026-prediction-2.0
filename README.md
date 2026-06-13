@@ -13,9 +13,9 @@
 ### 1. 雙泊松分佈比分預測 (Double Poisson Model)
 兩隊對決時的常規時間比分並非直接比較戰力大小，而是根據雙方的 **FIFA ELO 積分**、**先發 11 人戰力值 (Starting PQS)**，以及**當前累積疲勞度**，計算雙方的進球期望值 $\lambda$ (主隊/實力強者) 與 $\mu$ (客隊/挑戰者)：
 *   **$\lambda$ (Team A)**:
-    $$\lambda = \max\left(0.2, 1.3 + \frac{\text{elo}_A - \text{elo}_B}{450} + \frac{\text{pqs}_A - \text{pqs}_B}{30} + \text{host\_boost}_A - \text{host\_boost}_B \times 0.5\right)$$
+    $$\lambda = \max\left(0.2, 1.3 + \frac{\text{ELO}_A - \text{ELO}_B}{450} + \frac{\text{PQS}_A - \text{PQS}_B}{30} + \text{HostBoost}_A - \text{HostBoost}_B \times 0.5\right)$$
 *   **$\mu$ (Team B)**:
-    $$\mu = \max\left(0.2, 1.1 - \frac{\text{elo}_A - \text{elo}_B}{450} - \frac{\text{pqs}_A - \text{pqs}_B}{30} + \text{host\_boost}_B - \text{host\_boost}_A \times 0.5\right)$$
+    $$\mu = \max\left(0.2, 1.1 - \frac{\text{ELO}_A - \text{ELO}_B}{450} - \frac{\text{PQS}_A - \text{PQS}_B}{30} + \text{HostBoost}_B - \text{HostBoost}_A \times 0.5\right)$$
 
 隨後將期望值帶入泊松分佈進行隨機抽樣，模擬得出具體進球數 $G_A \sim \text{Poisson}(\lambda)$ 與 $G_B \sim \text{Poisson}(\mu)$。此外，系統導入了 **Dixon-Coles 平局修正**，將兩隊同時抽樣到 0 球的機率進行 25% 權重分配（修正為 1:1 或維持 0:0），使平局機率更貼近現實世界。
 
@@ -28,19 +28,19 @@
 大賽賽程密集，球員體力會隨每場比賽累積流失：
 *   每隊初始疲勞度 $f = 0.0$。
 *   每踢完一場比賽，疲勞度累加：
-    $$\Delta f = 0.04 \times (1.0 - \text{bench\_pqs}) + (\text{若打延長賽額外 } +0.02)$$
-    *板凳深度評分 (`bench_pqs`) 越佳的國家隊，每場累積疲勞的速度越慢。*
+    $$\Delta f = 0.04 \times (1.0 - \text{BenchPQS}) + (\text{若打延長賽額外 } +0.02)$$
+    *板凳深度評分 (`BenchPQS`) 越佳的國家隊，每場累積疲勞的速度越慢。*
 *   計算下一場對戰期望時，ELO 與 PQS 會進行乘積折損：
-    $$\text{pqs}_{\text{active}} = \text{starting\_pqs} \times (1.0 - f)$$
-    $$\text{elo}_{\text{active}} = \text{fifa\_points} \times (1.0 - f \times 0.05)$$
+    $$\text{PQS}_{\text{active}} = \text{StartingPQS} \times (1.0 - f)$$
+    $$\text{ELO}_{\text{active}} = \text{FIFAPoints} \times (1.0 - f \times 0.05)$$
 
 ### 4. PK 大戰門將 vs 射手屬性對戰 (GK OVR vs Shooters in Penalty Shootout)
 淘汰賽常規與延長賽打平後進入點球大戰，本系統捨棄了 50/50 隨機碰運氣的設計，改由屬性決定勝負：
-*   **守門員實力**: 提取先發陣容中 `overall` 最高者作為點球 GK ($GK_{\text{ovr}}$)，若無則預設為 60。
-*   **射手平均實力**: 提取除門將外 `overall` 前 5 高的球員平均值 ($Shoot_{\text{ovr}}$)。
+*   **守門員實力**: 提取先發陣容中 `overall` 最高者作為點球 GK ($GK_{\text{OVR}}$)，若無則預設為 60。
+*   **射手平均實力**: 提取除門將外 `overall` 前 5 高的球員平均值 ($Shoot_{\text{OVR}}$)。
 *   **罰進機率**（限制在 $[0.55, 0.90]$ 區間內）：
-    $$\text{rate}_A = 0.75 + \frac{Shoot_{\text{ovr}, A} - GK_{\text{ovr}, B}}{200}$$
-    $$\text{rate}_B = 0.75 + \frac{Shoot_{\text{ovr}, B} - GK_{\text{ovr}, A}}{200}$$
+    $$\text{rate}_A = 0.75 + \frac{\text{Shoot}_{\text{OVR}, A} - \text{GK}_{\text{OVR}, B}}{200}$$
+    $$\text{rate}_B = 0.75 + \frac{\text{Shoot}_{\text{OVR}, B} - \text{GK}_{\text{OVR}, A}}{200}$$
 
 ---
 
@@ -67,7 +67,7 @@
 *   `src/generate_frontend_data.py` - 前端數據生成器 (解析 CSV 並產生 `teams_db.json`)
 *   `src/player_level_simulator.py` - Python 蒙地卡羅 10,000 次模擬器核心
 *   `frontend/src/App.jsx` - React 前端核心邏輯與對陣圖 UI 渲染 (已完全中文化)
-*   `frontend/src/teams_db.json` - 包含 48 隊 26 人大名單 the JSON 數據庫
+*   `frontend/src/teams_db.json` - 包含 48 隊 26 人大名單的 JSON 數據庫
 *   `archive/` - 用於數據生成器讀取的國家隊 FIFA 積分歷史資料目錄
 
 ---
